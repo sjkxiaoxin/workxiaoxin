@@ -1,7 +1,7 @@
 export default typeof definePageConfig === 'function'
   ? definePageConfig({
-      navigationBarTitleText: '飞任务'
+      navigationBarTitleText: '创建任务'
     })
   : {
-      navigationBarTitleText: '飞任务'
+      navigationBarTitleText: '创建任务'
     }
