@@ -1,36 +1,120 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { View, Text } from '@tarojs/components'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
-import { Settings, Moon, Bell, LogOut, User, ChevronRight } from 'lucide-react-taro'
+import { Moon, Bell, LogOut, ChevronRight, Users } from 'lucide-react-taro'
 import Taro from '@tarojs/taro'
+import { Network } from '@/network'
+
+interface UserStats {
+  createdCount: number
+  assignedCount: number
+  completedCount: number
+}
 
 const ProfilePage = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userInfo, setUserInfo] = useState({
+    id: '',
     name: '用户',
     avatar: ''
+  })
+  const [userStats, setUserStats] = useState<UserStats>({
+    createdCount: 0,
+    assignedCount: 0,
+    completedCount: 0
   })
   const [darkMode, setDarkMode] = useState(false)
   const [notificationEnabled, setNotificationEnabled] = useState(true)
 
-  // 模拟登录
+  // 获取用户信息
+  const fetchUserInfo = async () => {
+    if (!isLoggedIn) return
+    
+    try {
+      // 获取用户基本信息
+      const userRes = await Network.request({
+        url: '/api/users/user-001', // 当前登录用户ID
+        method: 'GET'
+      })
+      
+      console.log('获取用户信息响应:', userRes)
+      
+      if (userRes && userRes.data && userRes.data.data) {
+        setUserInfo({
+          id: userRes.data.data.id,
+          name: userRes.data.data.name,
+          avatar: userRes.data.data.avatar || ''
+        })
+      }
+      
+      // 获取任务统计
+      const statsRes = await Network.request({
+        url: '/api/tasks',
+        method: 'GET'
+      })
+      
+      console.log('获取任务列表响应:', statsRes)
+      
+      if (statsRes && statsRes.data && statsRes.data.data) {
+        const tasks = statsRes.data.data
+        
+        // 计算统计数据
+        const createdCount = tasks.filter(t => t.creator_id === 'user-001').length
+        const assignedCount = tasks.filter(t => t.assignee_id === 'user-001').length
+        const completedCount = tasks.filter(t => t.assignee_id === 'user-001' && t.status === 'done').length
+        
+        setUserStats({
+          createdCount,
+          assignedCount,
+          completedCount
+        })
+      }
+    } catch (error) {
+      console.error('获取用户信息失败:', error)
+      Taro.showToast({ title: '获取用户信息失败', icon: 'none' })
+    }
+  }
+
+  useEffect(() => {
+    // 检查登录状态
+    const loggedIn = Taro.getStorageSync('isLoggedIn')
+    if (loggedIn) {
+      setIsLoggedIn(true)
+      fetchUserInfo()
+    }
+  }, [])
+
+  // 模拟登录（实际项目中应调用微信登录API）
   const handleLogin = async () => {
     Taro.showLoading({ title: '登录中...' })
     
-    // 模拟登录过程
-    setTimeout(() => {
-      Taro.hideLoading()
+    try {
+      // 模拟登录过程（实际应调用微信.login()获取openid，然后后端验证）
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
       setIsLoggedIn(true)
+      Taro.setStorageSync('isLoggedIn', true)
+      Taro.setStorageSync('userId', 'user-001')
+      
       setUserInfo({
+        id: 'user-001',
         name: '张三',
         avatar: ''
       })
+      
+      Taro.hideLoading()
       Taro.showToast({ title: '登录成功', icon: 'success' })
-    }, 1000)
+      
+      // 获取用户信息和统计数据
+      fetchUserInfo()
+    } catch (error) {
+      Taro.hideLoading()
+      Taro.showToast({ title: '登录失败', icon: 'none' })
+    }
   }
 
   // 退出登录
@@ -41,7 +125,10 @@ const ProfilePage = () => {
       success: (res) => {
         if (res.confirm) {
           setIsLoggedIn(false)
-          setUserInfo({ name: '用户', avatar: '' })
+          Taro.removeStorageSync('isLoggedIn')
+          Taro.removeStorageSync('userId')
+          setUserInfo({ id: '', name: '用户', avatar: '' })
+          setUserStats({ createdCount: 0, assignedCount: 0, completedCount: 0 })
           Taro.showToast({ title: '已退出登录', icon: 'none' })
         }
       }
@@ -52,14 +139,22 @@ const ProfilePage = () => {
   const handleDarkModeChange = (checked: boolean) => {
     setDarkMode(checked)
     Taro.showToast({ title: checked ? '深色模式已开启' : '深色模式已关闭', icon: 'none' })
-    // TODO: 实际切换深色模式逻辑
+    
+    // 实际切换深色模式逻辑
+    if (checked) {
+      Taro.setStorageSync('theme', 'dark')
+    } else {
+      Taro.setStorageSync('theme', 'light')
+    }
   }
 
   // 切换通知设置
   const handleNotificationChange = (checked: boolean) => {
     setNotificationEnabled(checked)
     Taro.showToast({ title: checked ? '通知已开启' : '通知已关闭', icon: 'none' })
-    // TODO: 实际切换通知设置逻辑
+    
+    // 实际切换通知设置逻辑
+    Taro.setStorageSync('notificationEnabled', checked)
   }
 
   return (
@@ -73,7 +168,7 @@ const ProfilePage = () => {
                 <AvatarImage src={userInfo.avatar} />
               ) : (
                 <AvatarFallback>
-                  <Text className="text-lg">{userInfo.name[0]}</Text>
+                  <Text className="block text-lg">{userInfo.name[0]}</Text>
                 </AvatarFallback>
               )}
             </Avatar>
@@ -94,102 +189,102 @@ const ProfilePage = () => {
         </CardContent>
       </Card>
 
+      {/* 统计数据卡片 */}
+      {isLoggedIn && (
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle>
+              <Text className="block">我的统计</Text>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <View className="flex flex-row justify-around">
+              <View className="flex flex-col items-center">
+                <Text className="block text-2xl font-bold text-primary">{userStats.createdCount}</Text>
+                <Text className="block text-sm text-muted-foreground">我创建的</Text>
+              </View>
+              <View className="flex flex-col items-center">
+                <Text className="block text-2xl font-bold text-primary">{userStats.assignedCount}</Text>
+                <Text className="block text-sm text-muted-foreground">我负责的</Text>
+              </View>
+              <View className="flex flex-col items-center">
+                <Text className="block text-2xl font-bold text-primary">{userStats.completedCount}</Text>
+                <Text className="block text-sm text-muted-foreground">已完成</Text>
+              </View>
+            </View>
+          </CardContent>
+        </Card>
+      )}
+
       {/* 设置区域 */}
       <Card className="mb-4">
         <CardHeader>
           <CardTitle>
-            <View className="flex flex-row items-center gap-2">
-              <Settings className="w-5 h-5" size={20} color="#1890ff" />
-              <Text className="block">设置</Text>
-            </View>
+            <Text className="block">设置</Text>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-4">
           {/* 深色模式 */}
           <View className="flex flex-row items-center justify-between">
             <View className="flex flex-row items-center gap-2">
               <Moon className="w-4 h-4" size={16} color="#8c8c8c" />
-              <Text className="block text-sm text-foreground">深色模式</Text>
+              <Text className="block text-base">深色模式</Text>
             </View>
             <Switch
               checked={darkMode}
               onCheckedChange={handleDarkModeChange}
             />
           </View>
-
+          
           <Separator />
-
+          
+          {/* 小队管理 */}
+          {isLoggedIn && (
+            <View 
+              className="flex flex-row items-center justify-between" 
+              onClick={() => Taro.navigateTo({ url: '/pages/team/index' })}
+            >
+              <View className="flex flex-row items-center gap-2">
+                <Users className="w-4 h-4" size={16} color="#1890ff" />
+                <Text className="block text-base">小队管理</Text>
+              </View>
+              <ChevronRight className="w-4 h-4" size={16} color="#8c8c8c" />
+            </View>
+          )}
+          
+          <Separator />
+          
           {/* 通知设置 */}
           <View className="flex flex-row items-center justify-between">
             <View className="flex flex-row items-center gap-2">
               <Bell className="w-4 h-4" size={16} color="#8c8c8c" />
-              <Text className="block text-sm text-foreground">消息通知</Text>
+              <Text className="block text-base">消息通知</Text>
             </View>
             <Switch
               checked={notificationEnabled}
               onCheckedChange={handleNotificationChange}
             />
           </View>
-
-          <Separator />
-
-          {/* 个人资料 */}
-          <Button
-            variant="ghost"
-            className="w-full justify-between"
-            onClick={() => Taro.showToast({ title: '个人资料功能开发中', icon: 'none' })}
-          >
-            <View className="flex flex-row items-center gap-2">
-              <User className="w-4 h-4" size={16} color="#8c8c8c" />
-              <Text className="block text-sm text-foreground">个人资料</Text>
+          
+          {isLoggedIn && <Separator />}
+          
+          {/* 退出登录 */}
+          {isLoggedIn && (
+            <View className="flex flex-row items-center justify-between" onClick={handleLogout}>
+              <View className="flex flex-row items-center gap-2">
+                <LogOut className="w-4 h-4" size={16} color="#f5222d" />
+                <Text className="block text-base text-destructive">退出登录</Text>
+              </View>
+              <ChevronRight className="w-4 h-4" size={16} color="#8c8c8c" />
             </View>
-            <ChevronRight className="w-4 h-4" size={16} color="#8c8c8c" />
-          </Button>
+          )}
         </CardContent>
       </Card>
-
-      {/* 统计信息 */}
-      <Card className="mb-4">
-        <CardHeader>
-          <CardTitle>
-            <Text className="block">任务统计</Text>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <View className="grid grid-cols-3 gap-3">
-            <View className="flex flex-col items-center">
-              <Text className="block text-xl font-bold text-foreground">5</Text>
-              <Text className="block text-xs text-muted-foreground">我创建的</Text>
-            </View>
-            <View className="flex flex-col items-center">
-              <Text className="block text-xl font-bold text-foreground">3</Text>
-              <Text className="block text-xs text-muted-foreground">我负责的</Text>
-            </View>
-            <View className="flex flex-col items-center">
-              <Text className="block text-xl font-bold text-foreground">2</Text>
-              <Text className="block text-xs text-muted-foreground">已完成</Text>
-            </View>
-          </View>
-        </CardContent>
-      </Card>
-
-      {/* 退出登录按钮 */}
-      {isLoggedIn && (
-        <Button
-          variant="outline"
-          className="mt-4"
-          onClick={handleLogout}
-        >
-          <LogOut className="w-4 h-4 mr-2" size={16} color="#f5222d" />
-          <Text className="block text-destructive">退出登录</Text>
-        </Button>
-      )}
 
       {/* 版本信息 */}
-      <View className="mt-auto pt-4">
-        <Text className="block text-center text-xs text-muted-foreground">
-          飞任务 v1.0.0
-        </Text>
+      <View className="flex flex-col items-center mt-8">
+        <Text className="block text-sm text-muted-foreground">工作助手小新 v1.0.0</Text>
+        <Text className="block text-xs text-muted-foreground mt-2">基于 Taro + Supabase 开发</Text>
       </View>
     </View>
   )

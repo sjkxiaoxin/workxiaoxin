@@ -1,8 +1,8 @@
 {
   "miniprogramRoot": "./dist",
-  "projectname": "coze-mini-program",
-  "description": "飞任务小程序",
-  "appid": "touristappid",
+  "projectname": "work-assistant-xiaoxin",
+  "description": "工作助手小新 - 高效的任务管理小程序",
+  "appid": "wx7e43b736f80b7674",
   "setting": {
     "urlCheck": true,
     "es6": false,

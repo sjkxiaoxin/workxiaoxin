@@ -3,12 +3,13 @@ export default defineAppConfig({
     'pages/index/index',
     'pages/create/index',
     'pages/profile/index',
-    'pages/detail/index'
+    'pages/detail/index',
+    'pages/team/index'
   ],
   window: {
     backgroundTextStyle: 'light',
     navigationBarBackgroundColor: '#fff',
-    navigationBarTitleText: '飞任务',
+    navigationBarTitleText: '工作助手小新',
     navigationBarTextStyle: 'black'
   },
   tabBar: {

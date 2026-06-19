@@ -80,3 +80,36 @@ export const taskHistory = pgTable(
 		index("task_history_created_at_idx").on(table.created_at),
 	]
 );
+
+// 小队表
+export const teams = pgTable(
+	"teams",
+	{
+		id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+		name: varchar("name", { length: 100 }).notNull(),
+		creator_id: varchar("creator_id", { length: 36 }).notNull().references(() => users.id),
+		created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+		updated_at: timestamp("updated_at", { withTimezone: true }),
+	},
+	(table) => [
+		index("teams_creator_id_idx").on(table.creator_id),
+		index("teams_created_at_idx").on(table.created_at),
+	]
+);
+
+// 小队成员表
+export const teamMembers = pgTable(
+	"team_members",
+	{
+		id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+		team_id: varchar("team_id", { length: 36 }).notNull().references(() => teams.id, { onDelete: "cascade" }),
+		user_id: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+		role: varchar("role", { length: 20 }).notNull().default("member"), // owner 或 member
+		joined_at: timestamp("joined_at", { withTimezone: true }).defaultNow().notNull(),
+	},
+	(table) => [
+		index("team_members_team_id_idx").on(table.team_id),
+		index("team_members_user_id_idx").on(table.user_id),
+		index("team_members_role_idx").on(table.role),
+	]
+);

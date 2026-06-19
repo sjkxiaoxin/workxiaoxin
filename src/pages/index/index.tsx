@@ -1,54 +1,28 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { View, Text } from '@tarojs/components'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Skeleton } from '@/components/ui/skeleton'
 import { ClipboardList, Clock } from 'lucide-react-taro'
 import Taro from '@tarojs/taro'
+import { Network } from '@/network'
 
-// 模拟任务数据
+// 任务数据类型（对应后端API）
 interface Task {
   id: string
   title: string
+  description?: string
   status: 'todo' | 'in_progress' | 'done'
-  assignee: string
-  assigneeAvatar?: string
+  assignee_id: string
+  creator_id: string
   deadline: string
-  creator: string
-  isUrgent: boolean
+  is_urgent: boolean
+  created_at: string
+  updated_at: string
 }
-
-const mockTasks: Task[] = [
-  {
-    id: '1',
-    title: '完成产品需求文档',
-    status: 'in_progress',
-    assignee: '张三',
-    deadline: '2024-12-20',
-    creator: '李四',
-    isUrgent: true
-  },
-  {
-    id: '2',
-    title: '设计首页原型',
-    status: 'todo',
-    assignee: '王五',
-    deadline: '2024-12-25',
-    creator: '张三',
-    isUrgent: false
-  },
-  {
-    id: '3',
-    title: '编写后端接口',
-    status: 'done',
-    assignee: '赵六',
-    deadline: '2024-12-15',
-    creator: '李四',
-    isUrgent: false
-  }
-]
 
 // 状态映射
 const statusConfig = {
@@ -57,26 +31,69 @@ const statusConfig = {
   done: { label: '已完成', color: 'bg-gray-400' }
 }
 
+// 模拟用户信息（实际应从登录状态获取）
+const MOCK_USER_ID = 'user-001'
+
 const IndexPage = () => {
   const [activeTab, setActiveTab] = useState('all')
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  // 根据筛选条件过滤任务
-  const filteredTasks = mockTasks.filter(task => {
-    if (activeTab === 'created') return task.creator === '张三'
-    if (activeTab === 'assigned') return task.assignee === '张三'
-    return true
-  })
+  // 获取任务列表
+  useEffect(() => {
+    fetchTasks()
+  }, [activeTab])
+
+  const fetchTasks = async () => {
+    setLoading(true)
+    setError(null)
+    
+    try {
+      console.log('获取任务列表 - URL:', '/api/tasks')
+      console.log('获取任务列表 - Method:', 'GET')
+      console.log('获取任务列表 - Params:', { userId: MOCK_USER_ID, filter: activeTab })
+      
+      const res = await Network.request({
+        url: '/api/tasks',
+        method: 'GET',
+        data: {
+          userId: MOCK_USER_ID,
+          filter: activeTab
+        }
+      })
+      
+      console.log('获取任务列表 - Response:', res)
+      
+      // 数据解包：后端返回 { code: 200, msg: 'success', data: [...] }
+      const taskList = res.data?.data || []
+      setTasks(taskList)
+    } catch (err) {
+      console.error('获取任务列表失败:', err)
+      setError('获取任务列表失败，请重试')
+      Taro.showToast({ title: '获取任务列表失败', icon: 'none' })
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // 点击任务卡片，跳转到详情页
   const handleTaskClick = (taskId: string) => {
     Taro.navigateTo({ url: `/pages/detail/index?id=${taskId}` })
   }
 
+  // 格式化截止时间
+  const formatDeadline = (deadline: string) => {
+    if (!deadline) return '无截止时间'
+    const date = new Date(deadline)
+    return `${date.getMonth() + 1}/${date.getDate()}`
+  }
+
   return (
     <View className="flex flex-col h-full bg-background">
       {/* 页面标题 */}
       <View className="px-4 pt-4 pb-2">
-        <Text className="block text-xl font-semibold text-foreground">飞任务</Text>
+        <Text className="block text-xl font-semibold text-foreground">工作助手小新</Text>
         <Text className="block text-sm text-muted-foreground mt-1">高效协作，准时完成</Text>
       </View>
 
@@ -88,24 +105,48 @@ const IndexPage = () => {
           <TabsTrigger value="all">全部</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="created" className="mt-4">
-          <TaskList tasks={filteredTasks} onTaskClick={handleTaskClick} />
-        </TabsContent>
-
-        <TabsContent value="assigned" className="mt-4">
-          <TaskList tasks={filteredTasks} onTaskClick={handleTaskClick} />
-        </TabsContent>
-
-        <TabsContent value="all" className="mt-4">
-          <TaskList tasks={filteredTasks} onTaskClick={handleTaskClick} />
+        <TabsContent value={activeTab} className="mt-4">
+          {loading ? (
+            <TaskListSkeleton />
+          ) : error ? (
+            <Alert className="bg-destructive bg-opacity-10">
+              <AlertDescription className="text-destructive">
+                <Text className="block">{error}</Text>
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <TaskList tasks={tasks} onTaskClick={handleTaskClick} formatDeadline={formatDeadline} />
+          )}
         </TabsContent>
       </Tabs>
     </View>
   )
 }
 
+// 加载骨架屏
+const TaskListSkeleton = () => (
+  <View className="space-y-3">
+    {[1, 2, 3].map(i => (
+      <Card key={i}>
+        <CardContent className="p-4">
+          <Skeleton className="h-4 w-3/4 mb-2" />
+          <Skeleton className="h-3 w-1/2" />
+        </CardContent>
+      </Card>
+    ))}
+  </View>
+)
+
 // 任务列表组件
-const TaskList = ({ tasks, onTaskClick }: { tasks: Task[], onTaskClick: (id: string) => void }) => {
+const TaskList = ({ 
+  tasks, 
+  onTaskClick, 
+  formatDeadline 
+}: { 
+  tasks: Task[], 
+  onTaskClick: (id: string) => void,
+  formatDeadline: (deadline: string) => string
+}) => {
   if (tasks.length === 0) {
     return (
       <Alert className="bg-secondary">
@@ -123,7 +164,7 @@ const TaskList = ({ tasks, onTaskClick }: { tasks: Task[], onTaskClick: (id: str
       {tasks.map(task => (
         <Card 
           key={task.id} 
-          className={`cursor-pointer hover:shadow-md ${task.isUrgent ? 'border-l-4 border-l-red-500' : ''}`}
+          className={`cursor-pointer hover:shadow-md ${task.is_urgent ? 'border-l-4 border-l-red-500' : ''}`}
           onClick={() => onTaskClick(task.id)}
         >
           <CardHeader className="pb-2">
@@ -139,17 +180,13 @@ const TaskList = ({ tasks, onTaskClick }: { tasks: Task[], onTaskClick: (id: str
           <CardContent className="pt-0">
             <View className="flex flex-row items-center gap-2 text-sm text-muted-foreground">
               <Avatar className="w-5 h-5">
-                {task.assigneeAvatar ? (
-                  <AvatarImage src={task.assigneeAvatar} />
-                ) : (
-                  <AvatarFallback>
-                    <Text className="text-xs">{task.assignee[0]}</Text>
-                  </AvatarFallback>
-                )}
+                <AvatarFallback>
+                  <Text className="text-xs">{task.assignee_id.slice(0, 1).toUpperCase()}</Text>
+                </AvatarFallback>
               </Avatar>
-              <Text className="block flex-1">{task.assignee}</Text>
+              <Text className="block flex-1">{task.assignee_id}</Text>
               <Clock className="w-4 h-4" size={16} color="#8c8c8c" />
-              <Text className="block">{task.deadline}</Text>
+              <Text className="block">{formatDeadline(task.deadline)}</Text>
             </View>
           </CardContent>
         </Card>

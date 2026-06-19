@@ -22,6 +22,7 @@ export class UpdateStatusDto {
 }
 
 export class CreateCommentDto {
+  taskId: string;
   userId: string;
   content: string;
 }
