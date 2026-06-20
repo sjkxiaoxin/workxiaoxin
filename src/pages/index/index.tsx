@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ClipboardList, Clock } from 'lucide-react-taro'
 import Taro from '@tarojs/taro'
 import { Network } from '@/network'
+import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 
 // 任务数据类型（对应后端API）
 interface Task {
@@ -31,14 +32,12 @@ const statusConfig = {
   done: { label: '已完成', color: 'bg-gray-400' }
 }
 
-// 模拟用户信息（实际应从登录状态获取）
-const MOCK_USER_ID = 'user-001'
-
 const IndexPage = () => {
   const [activeTab, setActiveTab] = useState('all')
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const currentUserId = useCurrentUser()
 
   // 获取任务列表
   useEffect(() => {
@@ -52,13 +51,13 @@ const IndexPage = () => {
     try {
       console.log('获取任务列表 - URL:', '/api/tasks')
       console.log('获取任务列表 - Method:', 'GET')
-      console.log('获取任务列表 - Params:', { userId: MOCK_USER_ID, filter: activeTab })
+      console.log('获取任务列表 - Params:', { userId: currentUserId, filter: activeTab })
       
       const res = await Network.request({
         url: '/api/tasks',
         method: 'GET',
         data: {
-          userId: MOCK_USER_ID,
+          userId: currentUserId,
           filter: activeTab
         }
       })

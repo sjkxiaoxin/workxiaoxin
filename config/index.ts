@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import tailwindcss from '@tailwindcss/postcss';
 import { UnifiedViteWeappTailwindcssPlugin } from 'weapp-tailwindcss/vite';
+import wxssCompatPlugin from './postcss-wxss-compat';
 import { defineConfig, type UserConfigExport } from '@tarojs/cli';
 import type { PluginItem } from '@tarojs/taro/types/compile/config/project';
 import dotenv from 'dotenv';
@@ -115,9 +116,10 @@ export default defineConfig<'vite'>(async (merge, _env) => {
         {
           name: 'postcss-config-loader-plugin',
           config(config) {
-            // 通过 postcss 配置注册 tailwindcss 插件
+            // 通过 postcss 配置注册 tailwindcss 插件和 WXSS 兼容性插件
             if (typeof config.css?.postcss === 'object') {
               config.css?.postcss.plugins?.unshift(tailwindcss());
+              config.css?.postcss.plugins?.push(wxssCompatPlugin());
             }
           },
         },

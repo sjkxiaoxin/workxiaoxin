@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { View, Text } from '@tarojs/components'
-import Taro from '@tarojs/taro'
+import Taro, { useDidShow } from '@tarojs/taro'
 import { Network } from '@/network'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Users, Plus, Trash2, Crown, UserPlus } from 'lucide-react-taro'
+import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 
 interface TeamMember {
   id: string
@@ -29,11 +30,16 @@ interface Team {
 export default function TeamPage() {
   const [teams, setTeams] = useState<Team[]>([])
   const [loading, setLoading] = useState(true)
-  const [currentUserId] = useState('user_001') // 测试用户ID
+  const currentUserId = useCurrentUser()
   
   useEffect(() => {
     loadTeams()
   }, [])
+
+  // 每次页面显示时刷新小队列表（应对跨页面登录/操作）
+  useDidShow(() => {
+    loadTeams()
+  })
   
   const loadTeams = async () => {
     try {
@@ -75,35 +81,46 @@ export default function TeamPage() {
       } else {
         Taro.showToast({ title: res.data?.msg || '创建失败', icon: 'error' })
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('[TeamPage] 创建失败:', error)
-      Taro.showToast({ title: '创建失败', icon: 'error' })
+      const errMsg = error?.errMsg || error?.message || String(error)
+      Taro.showModal({
+        title: '创建失败',
+        content: `错误详情:\n${errMsg}\n\n请确认:\n1. 后端已启动：pnpm dev:server\n2. 数据库已初始化：POST /api/seed`,
+        showCancel: false,
+      })
     }
   }
   
   const inviteMember = async (teamId: string) => {
-    // 简化实现：直接邀请测试用户
-    try {
-      const testUserId = 'user_002'
-      
-      const res = await Network.request({
-        url: `/api/teams/${teamId}/members`,
-        method: 'POST',
-        data: { userId: testUserId }
-      })
-      
-      console.log('[TeamPage] 邀请成员:', res.data)
-      
-      if (res.data?.code === 200) {
-        Taro.showToast({ title: '邀请成功', icon: 'success' })
-        loadTeams()
-      } else {
-        Taro.showToast({ title: res.data?.msg || '邀请失败', icon: 'error' })
+    // 演示用：弹出可邀请用户列表，实际项目应调用接口获取待邀请用户
+    const mockInviteUsers = [
+      { id: 'user-002', name: '测试用户二' },
+      { id: 'user-003', name: '测试用户三' },
+    ]
+
+    Taro.showActionSheet({
+      itemList: mockInviteUsers.map(u => u.name),
+      success: async (res) => {
+        const selected = mockInviteUsers[res.tapIndex]
+        try {
+          const result = await Network.request({
+            url: `/api/teams/${teamId}/members`,
+            method: 'POST',
+            data: { userId: selected.id }
+          })
+          if (result.data?.code === 200) {
+            Taro.showToast({ title: '邀请成功', icon: 'success' })
+            loadTeams()
+          } else {
+            Taro.showToast({ title: result.data?.msg || '邀请失败', icon: 'error' })
+          }
+        } catch (error) {
+          console.error('[TeamPage] 邀请失败:', error)
+          Taro.showToast({ title: '邀请失败', icon: 'error' })
+        }
       }
-    } catch (error) {
-      console.error('[TeamPage] 邀请失败:', error)
-      Taro.showToast({ title: '邀请失败', icon: 'error' })
-    }
+    })
   }
   
   const deleteTeam = async (teamId: string) => {

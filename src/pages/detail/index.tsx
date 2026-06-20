@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Clock, User, MessageCircle, History, Trash2 } from 'lucide-react-taro'
 import Taro, { useRouter } from '@tarojs/taro'
 import { Network } from '@/network'
+import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 
 interface Task {
   id: string
@@ -54,6 +55,7 @@ const DetailPage = () => {
   const [history, setHistory] = useState<History[]>([])
   const [newComment, setNewComment] = useState('')
   const [loading, setLoading] = useState(true)
+  const currentUserId = useCurrentUser()
 
   // 获取任务详情
   const fetchTaskDetail = async (taskId: string) => {
@@ -102,7 +104,7 @@ const DetailPage = () => {
         method: 'PUT',
         data: {
           status: newStatus,
-          userId: 'user-001' // 当前登录用户ID
+          userId: currentUserId // 当前登录用户ID
         }
       })
       
@@ -134,7 +136,7 @@ const DetailPage = () => {
         url: `/api/tasks/${task.id}/comments`,
         method: 'POST',
         data: {
-          userId: 'user-001', // 当前登录用户ID
+          userId: currentUserId, // 当前登录用户ID
           content: newComment.trim()
         }
       })

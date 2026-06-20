@@ -6,8 +6,9 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Mic, Calendar, User, Send, Square } from 'lucide-react-taro'
-import Taro, { useLoad } from '@tarojs/taro'
+import Taro, { useLoad, useDidShow } from '@tarojs/taro'
 import { Network } from '@/network'
+import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 
 const CreatePage = () => {
   const [title, setTitle] = useState('')
@@ -20,6 +21,7 @@ const CreatePage = () => {
   const [recorderManager, setRecorderManager] = useState<Taro.RecorderManager | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [users, setUsers] = useState<Array<{ id: string; name: string; avatar?: string }>>([])
+  const currentUserId = useCurrentUser()
   
   // CRITICAL: 直接判断平台（同时支持微信和抖音）
   const isMiniApp = [Taro.ENV_TYPE.WEAPP as string, Taro.ENV_TYPE.TT as string].includes(Taro.getEnv() as string)
@@ -32,6 +34,11 @@ const CreatePage = () => {
   useEffect(() => {
     fetchUsers()
   }, [])
+
+  // 每次页面显示时刷新可派发成员列表
+  useDidShow(() => {
+    fetchUsers()
+  })
 
   // CRITICAL: 在useEffect中初始化RecorderManager（仅小程序端）
   useEffect(() => {
@@ -68,7 +75,7 @@ const CreatePage = () => {
       const res = await Network.request({
         url: '/api/tasks/assignable-members',
         method: 'GET',
-        data: { creatorId: 'user-001' }
+        data: { creatorId: currentUserId }
       })
       
       console.log('获取可派发成员响应:', res)
@@ -220,7 +227,7 @@ const CreatePage = () => {
           title: title.trim(),
           description: description.trim(),
           assigneeId: assigneeId,
-          creatorId: 'user-001', // 当前登录用户ID
+          creatorId: currentUserId, // 当前登录用户ID
           deadline: new Date(deadline).toISOString(),
           isUrgent: false
         }

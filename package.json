@@ -7,8 +7,8 @@
     "build": "pnpm exec concurrently --kill-others-on-fail --kill-signal SIGKILL -n lint,tsc,web,weapp,tt,server -c red,blue,green,yellow,cyan,magenta \"pnpm lint:build\" \"pnpm tsc\" \"pnpm build:web\" \"pnpm build:weapp\" \"pnpm build:tt\" \"pnpm build:server\"",
     "build:pack": "pnpm exec concurrently --kill-others-on-fail --kill-signal SIGKILL -n weapp,tt -c yellow,cyan \"pnpm build:weapp\" \"pnpm build:tt\"",
     "build:server": "pnpm --filter server build",
-    "build:tt": "taro build --type tt",
-    "build:weapp": "taro build --type weapp",
+    "build:tt": "taro build --type tt && node scripts/clean-wxss.js dist-tt",
+    "build:weapp": "taro build --type weapp && node scripts/clean-wxss.js dist",
     "build:web": "taro build --type h5",
     "dev": "pnpm exec concurrently --kill-others --kill-signal SIGKILL -n web,server -c blue,green \"pnpm dev:web\" \"pnpm dev:server\"",
     "dev:server": "pnpm --filter server dev",
@@ -99,11 +99,6 @@
   "packageManager": "pnpm@9.0.0",
   "engines": {
     "pnpm": ">=9.0.0"
-  },
-  "pnpm": {
-    "patchedDependencies": {
-      "@tarojs/plugin-mini-ci@4.1.9": "patches/@tarojs__plugin-mini-ci@4.1.9.patch"
-    }
   },
   "templateInfo": {
     "name": "default",

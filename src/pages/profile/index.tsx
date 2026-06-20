@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch'
 import { Moon, Bell, LogOut, ChevronRight, Users } from 'lucide-react-taro'
 import Taro from '@tarojs/taro'
 import { Network } from '@/network'
+import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 
 interface UserStats {
   createdCount: number
@@ -29,6 +30,7 @@ const ProfilePage = () => {
   })
   const [darkMode, setDarkMode] = useState(false)
   const [notificationEnabled, setNotificationEnabled] = useState(true)
+  const currentUserId = useCurrentUser()
 
   // 获取用户信息
   const fetchUserInfo = async () => {
@@ -37,7 +39,7 @@ const ProfilePage = () => {
     try {
       // 获取用户基本信息
       const userRes = await Network.request({
-        url: '/api/users/user-001', // 当前登录用户ID
+        url: `/api/users/${currentUserId}`, // 当前登录用户ID
         method: 'GET'
       })
       
@@ -63,9 +65,9 @@ const ProfilePage = () => {
         const tasks = statsRes.data.data
         
         // 计算统计数据
-        const createdCount = tasks.filter(t => t.creator_id === 'user-001').length
-        const assignedCount = tasks.filter(t => t.assignee_id === 'user-001').length
-        const completedCount = tasks.filter(t => t.assignee_id === 'user-001' && t.status === 'done').length
+        const createdCount = tasks.filter(t => t.creator_id === currentUserId).length
+        const assignedCount = tasks.filter(t => t.assignee_id === currentUserId).length
+        const completedCount = tasks.filter(t => t.assignee_id === currentUserId && t.status === 'done').length
         
         setUserStats({
           createdCount,
