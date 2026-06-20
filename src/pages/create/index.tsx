@@ -84,8 +84,13 @@ const CreatePage = () => {
       }
     } catch (error) {
       console.error('获取成员列表失败:', error)
-      Taro.showToast({ title: '获取成员失败', icon: 'none' })
-      setUsers([])
+      // 真机调试时使用 Mock 数据
+      const mockUsers = [
+        { id: 'user-001', name: '测试成员一' },
+        { id: 'user-002', name: '测试成员二' }
+      ]
+      setUsers(mockUsers)
+      Taro.showToast({ title: '使用演示成员', icon: 'none', duration: 2000 })
     }
   }
 
