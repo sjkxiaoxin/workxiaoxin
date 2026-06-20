@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { View, Text } from '@tarojs/components'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
-import { Moon, Bell, LogOut, ChevronRight, Users } from 'lucide-react-taro'
-import Taro from '@tarojs/taro'
+import { Bell, LogOut, ChevronRight, Users } from 'lucide-react-taro'
+
+import Taro, { useDidShow } from '@tarojs/taro'
 import { Network } from '@/network'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 
@@ -28,23 +29,23 @@ const ProfilePage = () => {
     assignedCount: 0,
     completedCount: 0
   })
-  const [darkMode, setDarkMode] = useState(false)
   const [notificationEnabled, setNotificationEnabled] = useState(true)
   const currentUserId = useCurrentUser()
 
-  // 获取用户信息
-  const fetchUserInfo = async () => {
-    if (!isLoggedIn) return
-    
+  // 获取用户信息和任务统计
+  const fetchUserInfo = useCallback(async () => {
+    if (!isLoggedIn || !currentUserId) return
+
     try {
       // 获取用户基本信息
       const userRes = await Network.request({
-        url: `/api/users/${currentUserId}`, // 当前登录用户ID
-        method: 'GET'
+        url: `/api/users/${currentUserId}`,
+        method: 'GET',
+        timeout: 15000
       })
-      
+
       console.log('获取用户信息响应:', userRes)
-      
+
       if (userRes && userRes.data && userRes.data.data) {
         setUserInfo({
           id: userRes.data.data.id,
@@ -52,69 +53,99 @@ const ProfilePage = () => {
           avatar: userRes.data.data.avatar || ''
         })
       }
-      
-      // 获取任务统计
+
+      // 获取任务列表（传入 userId，后端返回该用户相关的所有任务）
       const statsRes = await Network.request({
         url: '/api/tasks',
-        method: 'GET'
+        method: 'GET',
+        data: { userId: currentUserId, filter: 'all' },
+        timeout: 15000
       })
-      
+
       console.log('获取任务列表响应:', statsRes)
-      
+
       if (statsRes && statsRes.data && statsRes.data.data) {
         const tasks = statsRes.data.data
-        
+
         // 计算统计数据
         const createdCount = tasks.filter(t => t.creator_id === currentUserId).length
         const assignedCount = tasks.filter(t => t.assignee_id === currentUserId).length
         const completedCount = tasks.filter(t => t.assignee_id === currentUserId && t.status === 'done').length
-        
-        setUserStats({
-          createdCount,
-          assignedCount,
-          completedCount
-        })
+
+        setUserStats({ createdCount, assignedCount, completedCount })
       }
     } catch (error) {
       console.error('获取用户信息失败:', error)
-      Taro.showToast({ title: '获取用户信息失败', icon: 'none' })
     }
-  }
+  }, [isLoggedIn, currentUserId])
 
+  // 首次加载检查登录状态
   useEffect(() => {
-    // 检查登录状态
     const loggedIn = Taro.getStorageSync('isLoggedIn')
     if (loggedIn) {
       setIsLoggedIn(true)
-      fetchUserInfo()
     }
   }, [])
 
-  // 模拟登录（实际项目中应调用微信登录API）
+  // CRITICAL: 页面每次显示时刷新数据（tab 切换回来时自动更新统计）
+  useDidShow(() => {
+    if (isLoggedIn) {
+      fetchUserInfo()
+    }
+  })
+
+  // 登录状态或用户ID变化时触发获取
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchUserInfo()
+    }
+  }, [isLoggedIn, fetchUserInfo])
+
+  // 微信登录
   const handleLogin = async () => {
     Taro.showLoading({ title: '登录中...' })
-    
+
     try {
-      // 模拟登录过程（实际应调用微信.login()获取openid，然后后端验证）
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      setIsLoggedIn(true)
-      Taro.setStorageSync('isLoggedIn', true)
-      Taro.setStorageSync('userId', 'user-001')
-      
-      setUserInfo({
-        id: 'user-001',
-        name: '张三',
-        avatar: ''
+      // 调用微信登录获取 code
+      const { code } = await Taro.login()
+
+      if (!code) {
+        Taro.hideLoading()
+        Taro.showToast({ title: '获取登录凭证失败', icon: 'none' })
+        return
+      }
+
+      // 发送 code 到后端换取 openid 和用户信息
+      const res = await Network.request({
+        url: '/api/users/wx-login',
+        method: 'POST',
+        data: { code },
+        timeout: 15000
       })
-      
+
       Taro.hideLoading()
-      Taro.showToast({ title: '登录成功', icon: 'success' })
-      
-      // 获取用户信息和统计数据
-      fetchUserInfo()
+
+      if (res?.data?.code === 200 && res.data.data) {
+        const user = res.data.data
+        setIsLoggedIn(true)
+        Taro.setStorageSync('isLoggedIn', true)
+        Taro.setStorageSync('userId', user.id)
+        Taro.setStorageSync('openid', user.openid || '')
+
+        setUserInfo({
+          id: user.id,
+          name: user.name || '微信用户',
+          avatar: user.avatar || ''
+        })
+
+        Taro.showToast({ title: '登录成功', icon: 'success' })
+        fetchUserInfo()
+      } else {
+        Taro.showToast({ title: res?.data?.msg || '登录失败', icon: 'none' })
+      }
     } catch (error) {
       Taro.hideLoading()
+      console.error('登录失败:', error)
       Taro.showToast({ title: '登录失败', icon: 'none' })
     }
   }
@@ -135,19 +166,6 @@ const ProfilePage = () => {
         }
       }
     })
-  }
-
-  // 切换深色模式
-  const handleDarkModeChange = (checked: boolean) => {
-    setDarkMode(checked)
-    Taro.showToast({ title: checked ? '深色模式已开启' : '深色模式已关闭', icon: 'none' })
-    
-    // 实际切换深色模式逻辑
-    if (checked) {
-      Taro.setStorageSync('theme', 'dark')
-    } else {
-      Taro.setStorageSync('theme', 'light')
-    }
   }
 
   // 切换通知设置
@@ -226,20 +244,6 @@ const ProfilePage = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* 深色模式 */}
-          <View className="flex flex-row items-center justify-between">
-            <View className="flex flex-row items-center gap-2">
-              <Moon className="w-4 h-4" size={16} color="#8c8c8c" />
-              <Text className="block text-base">深色模式</Text>
-            </View>
-            <Switch
-              checked={darkMode}
-              onCheckedChange={handleDarkModeChange}
-            />
-          </View>
-          
-          <Separator />
-          
           {/* 小队管理 */}
           {isLoggedIn && (
             <View 

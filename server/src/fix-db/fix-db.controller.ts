@@ -64,6 +64,10 @@ export class FixDbController {
       `)
       results.push({ step: '创建 task_history 表', status: '✅ 完成' })
 
+      // 5. 确保 users 表有 openid 字段（微信订阅消息需要）
+      await client.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS openid TEXT DEFAULT \'\'')
+      results.push({ step: '添加 users.openid 字段', status: '✅ 完成' })
+
       // 验证
       const res = await client.query(
         "SELECT column_name FROM information_schema.columns WHERE table_name = 'tasks' ORDER BY ordinal_position"
@@ -99,6 +103,8 @@ CREATE TABLE IF NOT EXISTS task_history (
   description TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS openid TEXT DEFAULT '';
         `,
       },
       HttpStatus.INTERNAL_SERVER_ERROR

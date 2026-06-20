@@ -43,4 +43,25 @@ export class UsersController {
       data: user
     }
   }
+
+  /**
+   * 微信登录：用 code 换取 openid，返回用户信息
+   */
+  @Post('wx-login')
+  async wxLogin(@Body() body: { code: string }) {
+    try {
+      const user = await this.usersService.wxLogin(body.code)
+      return {
+        code: 200,
+        msg: 'success',
+        data: user
+      }
+    } catch (err: any) {
+      return {
+        code: 500,
+        msg: err.message || '微信登录失败',
+        data: null
+      }
+    }
+  }
 }

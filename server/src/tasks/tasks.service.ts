@@ -2,10 +2,14 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { CreateTaskDto, UpdateTaskDto, CreateCommentDto, UpdateStatusDto } from './dto';
 import { TeamsService } from '../teams/teams.service';
+import { NotificationService } from '../notification/notification.service';
 
 @Injectable()
 export class TasksService {
-  constructor(private readonly teamsService: TeamsService) {}
+  constructor(
+    private readonly teamsService: TeamsService,
+    private readonly notificationService: NotificationService,
+  ) {}
 
   // 创建任务
   async createTask(dto: CreateTaskDto) {
@@ -41,6 +45,25 @@ export class TasksService {
       taskId: data[0].id,
       assigneeId: dto.assigneeId
     });
+
+    // 异步发送任务派达通知（不阻塞主流程）
+    if (dto.assigneeId && dto.assigneeId !== dto.creatorId) {
+      // 查询创建者姓名
+      const client2 = getSupabaseClient();
+      const { data: creator } = await client2
+        .from('users')
+        .select('name')
+        .eq('id', dto.creatorId)
+        .maybeSingle();
+
+      this.notificationService.sendTaskAssignNotification({
+        taskId: String(data[0].id),
+        taskTitle: dto.title,
+        assigneeId: dto.assigneeId,
+        creatorName: creator?.name || '系统',
+        deadline: dto.deadline,
+      }).catch(err => console.error('发送任务派达通知失败:', err));
+    }
 
     return data[0];
   }
@@ -229,6 +252,15 @@ export class TasksService {
   async updateTaskStatus(id: string, status: 'todo' | 'in_progress' | 'done', userId: string) {
     const client = getSupabaseClient();
 
+    // 先查询旧状态和任务信息（用于通知）
+    const { data: oldTask } = await client
+      .from('tasks')
+      .select('id, title, status, assignee_id, creator_id')
+      .eq('id', id)
+      .maybeSingle();
+
+    const oldStatus = oldTask?.status || 'todo';
+
     const { data, error } = await client
       .from('tasks')
       .update({ status })
@@ -241,6 +273,27 @@ export class TasksService {
     // 记录历史
     const statusText = status === 'todo' ? '待办' : status === 'in_progress' ? '进行中' : '已完成';
     await this.addHistory(id, 'status_changed', userId, `状态变更为: ${statusText}`);
+
+    // 异步发送状态变更通知
+    if (oldTask && oldStatus !== status) {
+      // 查询操作者姓名
+      const { data: operator } = await client
+        .from('users')
+        .select('name')
+        .eq('id', userId)
+        .maybeSingle();
+
+      this.notificationService.sendTaskStatusChangeNotification({
+        taskId: String(id),
+        taskTitle: oldTask.title,
+        assigneeId: oldTask.assignee_id,
+        creatorId: oldTask.creator_id,
+        oldStatus,
+        newStatus: status,
+        operatorId: userId,
+        operatorName: operator?.name || '系统',
+      }).catch(err => console.error('发送状态变更通知失败:', err));
+    }
 
     return data[0];
   }

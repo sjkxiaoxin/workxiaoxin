@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { View, Text } from '@tarojs/components'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ClipboardList, Clock } from 'lucide-react-taro'
-import Taro from '@tarojs/taro'
+import Taro, { useDidShow } from '@tarojs/taro'
 import { Network } from '@/network'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 
@@ -40,68 +40,47 @@ const IndexPage = () => {
   const currentUserId = useCurrentUser()
 
   // 获取任务列表
-  useEffect(() => {
-    fetchTasks()
-  }, [activeTab])
-
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     setLoading(true)
     setError(null)
-    
+
     try {
-      console.log('获取任务列表 - URL:', '/api/tasks')
-      console.log('获取任务列表 - Method:', 'GET')
       console.log('获取任务列表 - Params:', { userId: currentUserId, filter: activeTab })
-      
+
       const res = await Network.request({
         url: '/api/tasks',
         method: 'GET',
         data: {
           userId: currentUserId,
           filter: activeTab
-        }
+        },
+        timeout: 15000
       })
-      
+
       console.log('获取任务列表 - Response:', res)
-      
+
       // 数据解包：后端返回 { code: 200, msg: 'success', data: [...] }
       const taskList = res.data?.data || []
       setTasks(taskList)
-    } catch (err) {
+    } catch (err: any) {
       console.error('获取任务列表失败:', err)
-      // 真机调试时使用 Mock 数据，确保页面能渲染
-      const mockTasks: Task[] = [
-        {
-          id: 'mock-1',
-          title: '示例任务一',
-          description: '这是一个演示任务',
-          status: 'todo',
-          assignee_id: 'user-001',
-          creator_id: 'user-001',
-          deadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-          is_urgent: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: 'mock-2',
-          title: '示例任务二',
-          description: '演示任务（真机调试模式）',
-          status: 'in_progress',
-          assignee_id: 'user-001',
-          creator_id: 'user-002',
-          deadline: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString(),
-          is_urgent: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-      ]
-      setTasks(mockTasks)
-      Taro.showToast({ title: '使用演示数据', icon: 'none', duration: 2000 })
+      const errMsg = err?.errMsg || err?.message || '网络请求失败'
+      setError(errMsg)
+      setTasks([])
     } finally {
       setLoading(false)
     }
-  }
+  }, [currentUserId, activeTab])
+
+  // tab 切换时获取
+  useEffect(() => {
+    fetchTasks()
+  }, [fetchTasks])
+
+  // CRITICAL: 页面重新显示时刷新（从创建页切回 tab 时触发）
+  useDidShow(() => {
+    fetchTasks()
+  })
 
   // 点击任务卡片，跳转到详情页
   const handleTaskClick = (taskId: string) => {

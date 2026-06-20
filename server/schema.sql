@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS tasks (
   status TEXT DEFAULT 'todo' CHECK (status IN ('todo', 'in_progress', 'done')),
   creator_id TEXT REFERENCES users(id),
   assignee_id TEXT REFERENCES users(id),
-  due_date TIMESTAMP WITH TIME ZONE,
+  deadline TIMESTAMP WITH TIME ZONE,
+  is_urgent BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -48,6 +49,16 @@ CREATE TABLE IF NOT EXISTS team_members (
   role TEXT DEFAULT 'member' CHECK (role IN ('owner', 'member')),
   joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(team_id, user_id)
+);
+
+-- 6. 任务历史表
+CREATE TABLE IF NOT EXISTS task_history (
+  id SERIAL PRIMARY KEY,
+  task_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE,
+  action TEXT NOT NULL,
+  user_id TEXT REFERENCES users(id),
+  description TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- 6. 插入测试用户

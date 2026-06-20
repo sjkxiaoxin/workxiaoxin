@@ -37,5 +37,11 @@ export default defineAppConfig({
         selectedIconPath: './assets/tabbar/user-active.png'
       }
     ]
+  },
+  // 录音权限声明（微信小程序必须配置，否则 RecorderManager 静默失败）
+  permission: {
+    'scope.record': {
+      desc: '需要使用您的麦克风来录制语音任务描述'
+    }
   }
 })

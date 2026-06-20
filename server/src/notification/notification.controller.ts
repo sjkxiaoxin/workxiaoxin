@@ -34,13 +34,13 @@ export class NotificationController {
     taskId: string
     taskTitle: string
     assigneeId: string
-    assigneeOpenid?: string
+    creatorId: string
     oldStatus: string
     newStatus: string
     operatorName?: string
   }) {
     await this.notificationService.sendTaskStatusChangeNotification(body)
-    
+
     return {
       code: 200,
       msg: 'success',
