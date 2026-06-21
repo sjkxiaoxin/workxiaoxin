@@ -23,6 +23,8 @@ interface Task {
   is_urgent: boolean
   created_at: string
   updated_at: string
+  assignee?: { id: string; name: string; avatar?: string }
+  creator?: { id: string; name: string; avatar?: string }
 }
 
 type FilterType = 'created' | 'assigned' | 'completed' | 'all'
@@ -189,21 +191,28 @@ const TaskList = ({
               <CardTitle className="text-base flex-1">
                 <Text className="block">{task.title}</Text>
               </CardTitle>
-              <Badge className={`${statusConfig[task.status].color} text-white`}>
-                <Text className="block text-xs">{statusConfig[task.status].label}</Text>
+              <Badge className={`${statusConfig[task.status]?.color || 'bg-gray-400'} text-white ml-2`}>
+                <Text className="block text-xs">{statusConfig[task.status]?.label || task.status}</Text>
               </Badge>
             </View>
+            {task.description ? (
+              <Text className="block text-sm text-muted-foreground mt-1 line-clamp-2">{task.description}</Text>
+            ) : null}
           </CardHeader>
           <CardContent className="pt-0">
-            <View className="flex flex-row items-center gap-2 text-sm text-muted-foreground">
+            <View className="flex flex-row items-center text-sm text-muted-foreground" style={{ gap: '8px' }}>
               <Avatar className="w-5 h-5">
                 <AvatarFallback>
-                  <Text className="text-xs">{task.assignee_id.slice(0, 1).toUpperCase()}</Text>
+                  <Text className="text-xs">{(task.assignee?.name || task.assignee_id || '?').slice(0, 1).toUpperCase()}</Text>
                 </AvatarFallback>
               </Avatar>
-              <Text className="block flex-1">{task.assignee_id}</Text>
-              <Clock className="w-4 h-4" size={16} color="#8c8c8c" />
-              <Text className="block">{formatDeadline(task.deadline)}</Text>
+              <Text className="block flex-1">{task.assignee?.name || task.assignee_id || '未指定'}</Text>
+              {task.deadline ? (
+                <View className="flex flex-row items-center" style={{ gap: '4px' }}>
+                  <Clock className="w-4 h-4" size={16} color="#8c8c8c" />
+                  <Text className="block">{formatDeadline(task.deadline)}</Text>
+                </View>
+              ) : null}
             </View>
           </CardContent>
         </Card>

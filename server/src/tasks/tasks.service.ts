@@ -148,7 +148,11 @@ export class TasksService {
     
     let query = client
       .from('tasks')
-      .select('id, title, description, status, assignee_id, creator_id, deadline, is_urgent, created_at, updated_at')
+      .select(`
+        id, title, description, status, assignee_id, creator_id, deadline, is_urgent, created_at, updated_at,
+        assignee:users!tasks_assignee_id_fkey(id, name, avatar),
+        creator:users!tasks_creator_id_fkey(id, name, avatar)
+      `)
       .order('created_at', { ascending: false });
 
     // 按状态筛选
