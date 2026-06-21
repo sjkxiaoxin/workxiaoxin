@@ -37,16 +37,21 @@ export class UsersService {
   /**
    * 创建用户
    */
-  async create(data: { name: string; avatar?: string; openid?: string }) {
+  async create(data: { id?: string; name: string; avatar?: string; openid?: string }) {
     const client = getSupabaseClient()
+
+    const insertData: Record<string, any> = {
+      name: data.name,
+      avatar: data.avatar || '',
+      openid: data.openid || ''
+    }
+    if (data.id) {
+      insertData.id = data.id
+    }
 
     const result = await client
       .from('users')
-      .insert({
-        name: data.name,
-        avatar: data.avatar || '',
-        openid: data.openid || ''
-      })
+      .insert(insertData)
       .select()
 
     return result.data?.[0] || null
@@ -85,6 +90,28 @@ export class UsersService {
     }
 
     return true
+  }
+
+  /**
+   * 审核测试登录：返回预设测试用户，无需微信授权
+   * 用于微信小程序提审时审核人员登录测试
+   */
+  async testLogin() {
+    const TEST_USER_ID = 'user-001'
+
+    // 先查找测试用户是否存在
+    let user = await this.findOne(TEST_USER_ID)
+
+    // 如果不存在，自动创建
+    if (!user) {
+      user = await this.create({
+        id: TEST_USER_ID,
+        name: '张三（测试账号）',
+        openid: 'test-openid-review'
+      })
+    }
+
+    return user
   }
 
   /**

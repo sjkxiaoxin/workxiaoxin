@@ -45,6 +45,28 @@ export class UsersController {
   }
 
   /**
+   * 审核测试登录：无需微信授权，返回预设测试账号
+   * 用于微信小程序提审时审核人员登录测试
+   */
+  @Post('test-login')
+  async testLogin() {
+    try {
+      const user = await this.usersService.testLogin()
+      return {
+        code: 200,
+        msg: 'success',
+        data: user
+      }
+    } catch (err: any) {
+      return {
+        code: 500,
+        msg: err.message || '测试登录失败',
+        data: null
+      }
+    }
+  }
+
+  /**
    * 微信登录：用 code 换取 openid，返回用户信息
    */
   @Post('wx-login')

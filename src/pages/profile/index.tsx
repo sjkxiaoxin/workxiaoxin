@@ -150,6 +150,44 @@ const ProfilePage = () => {
     }
   }
 
+  // 审核测试登录（无需微信授权）
+  const handleTestLogin = async () => {
+    Taro.showLoading({ title: '测试登录中...' })
+
+    try {
+      const res = await Network.request({
+        url: '/api/users/test-login',
+        method: 'POST',
+        timeout: 15000
+      })
+
+      Taro.hideLoading()
+
+      if (res?.data?.code === 200 && res.data.data) {
+        const user = res.data.data
+        setIsLoggedIn(true)
+        Taro.setStorageSync('isLoggedIn', true)
+        Taro.setStorageSync('userId', user.id)
+        Taro.setStorageSync('openid', user.openid || '')
+
+        setUserInfo({
+          id: user.id,
+          name: user.name || '测试用户',
+          avatar: user.avatar || ''
+        })
+
+        Taro.showToast({ title: '测试登录成功', icon: 'success' })
+        fetchUserInfo()
+      } else {
+        Taro.showToast({ title: res?.data?.msg || '测试登录失败', icon: 'none' })
+      }
+    } catch (error) {
+      Taro.hideLoading()
+      console.error('测试登录失败:', error)
+      Taro.showToast({ title: '测试登录失败', icon: 'none' })
+    }
+  }
+
   // 退出登录
   const handleLogout = () => {
     Taro.showModal({
@@ -195,16 +233,35 @@ const ProfilePage = () => {
             <View className="flex-1">
               <Text className="block text-base font-medium text-foreground">{isLoggedIn ? userInfo.name : '未登录'}</Text>
               <Text className="block text-sm text-muted-foreground">
-                {isLoggedIn ? '点击查看个人资料' : '点击登录使用完整功能'}
+                {isLoggedIn ? '点击查看个人资料' : '请选择登录方式'}
               </Text>
             </View>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={isLoggedIn ? handleLogout : handleLogin}
-            >
-              <Text className="block">{isLoggedIn ? '退出' : '登录'}</Text>
-            </Button>
+            {!isLoggedIn ? (
+              <View className="flex flex-col gap-2">
+                <Button
+                  size="sm"
+                  variant="default"
+                  onClick={handleLogin}
+                >
+                  <Text className="block text-xs">微信登录</Text>
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleTestLogin}
+                >
+                  <Text className="block text-xs">审核测试登录</Text>
+                </Button>
+              </View>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleLogout}
+              >
+                <Text className="block">退出</Text>
+              </Button>
+            )}
           </View>
         </CardContent>
       </Card>
