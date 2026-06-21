@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
-import { Bell, LogOut, ChevronRight, Users } from 'lucide-react-taro'
+import { Bell, LogOut, ChevronRight, Users, FileText } from 'lucide-react-taro'
 
 import Taro, { useDidShow } from '@tarojs/taro'
 import { Network } from '@/network'
@@ -293,6 +293,17 @@ const ProfilePage = () => {
             />
           </View>
           
+          {isLoggedIn && <Separator />}
+          
+          {/* 隐私政策 */}
+          <View className="flex flex-row items-center justify-between" onClick={() => Taro.navigateTo({ url: '/pages/privacy/index' })}>
+              <View className="flex flex-row items-center gap-2">
+                <FileText className="w-4 h-4" size={16} color="#8c8c8c" />
+                <Text className="block text-base">隐私政策</Text>
+              </View>
+              <ChevronRight className="w-4 h-4" size={16} color="#8c8c8c" />
+          </View>
+
           {isLoggedIn && <Separator />}
           
           {/* 退出登录 */}

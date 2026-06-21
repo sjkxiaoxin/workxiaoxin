@@ -4,7 +4,8 @@ export default defineAppConfig({
     'pages/create/index',
     'pages/profile/index',
     'pages/detail/index',
-    'pages/team/index'
+    'pages/team/index',
+    'pages/privacy/index'
   ],
   window: {
     backgroundTextStyle: 'light',
