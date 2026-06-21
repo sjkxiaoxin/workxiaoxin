@@ -25,6 +25,8 @@ interface Task {
   updated_at: string
 }
 
+type FilterType = 'created' | 'assigned' | 'completed' | 'all'
+
 // 状态映射
 const statusConfig = {
   todo: { label: '待办', color: 'bg-orange-400' },
@@ -33,26 +35,27 @@ const statusConfig = {
 }
 
 const IndexPage = () => {
-  const [activeTab, setActiveTab] = useState('all')
+  const [activeTab, setActiveTab] = useState<FilterType>('all')
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const currentUserId = useCurrentUser()
 
   // 获取任务列表
-  const fetchTasks = useCallback(async () => {
+  const fetchTasks = useCallback(async (filter?: FilterType) => {
+    const currentFilter = filter ?? activeTab
     setLoading(true)
     setError(null)
 
     try {
-      console.log('获取任务列表 - Params:', { userId: currentUserId, filter: activeTab })
+      console.log('获取任务列表 - Params:', { userId: currentUserId, filter: currentFilter })
 
       const res = await Network.request({
         url: '/api/tasks',
         method: 'GET',
         data: {
           userId: currentUserId,
-          filter: activeTab
+          filter: currentFilter
         },
         timeout: 15000
       })
@@ -77,9 +80,17 @@ const IndexPage = () => {
     fetchTasks()
   }, [fetchTasks])
 
-  // CRITICAL: 页面重新显示时刷新（从创建页切回 tab 时触发）
+  // CRITICAL: 页面重新显示时刷新（从创建页切回 tab 时触发，或从我的页面带参跳过来）
   useDidShow(() => {
-    fetchTasks()
+    // 检查是否有来自统计页面的筛选参数
+    const pendingFilter = Taro.getStorageSync('pendingFilter') as FilterType | ''
+    if (pendingFilter) {
+      Taro.removeStorageSync('pendingFilter')
+      setActiveTab(pendingFilter)
+      fetchTasks(pendingFilter)
+    } else {
+      fetchTasks()
+    }
   })
 
   // 点击任务卡片，跳转到详情页
@@ -103,10 +114,11 @@ const IndexPage = () => {
       </View>
 
       {/* 状态筛选 Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="px-4">
-        <TabsList className="grid grid-cols-3 w-full">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as FilterType)} className="px-4">
+        <TabsList className="grid grid-cols-4 w-full">
           <TabsTrigger value="created">我创建的</TabsTrigger>
           <TabsTrigger value="assigned">我负责的</TabsTrigger>
+          <TabsTrigger value="completed">已完成</TabsTrigger>
           <TabsTrigger value="all">全部</TabsTrigger>
         </TabsList>
 

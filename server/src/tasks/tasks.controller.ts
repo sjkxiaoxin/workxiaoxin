@@ -19,7 +19,7 @@ export class TasksController {
   @Get()
   async list(
     @Query('userId') userId?: string,
-    @Query('filter') filter?: 'created' | 'assigned' | 'all',
+    @Query('filter') filter?: 'created' | 'assigned' | 'all' | 'completed',
     @Query('status') status?: 'todo' | 'in_progress' | 'done'
   ) {
     console.log('[TasksController] 查询任务列表:', { userId, filter, status });

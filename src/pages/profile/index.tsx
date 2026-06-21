@@ -219,17 +219,38 @@ const ProfilePage = () => {
           </CardHeader>
           <CardContent>
             <View className="flex flex-row justify-around">
-              <View className="flex flex-col items-center">
+              {/* 我创建的 */}
+              <View
+                className="flex flex-col items-center"
+                onClick={() => Taro.switchTab({ url: '/pages/index/index' }).then(() => {
+                  Taro.setStorageSync('pendingFilter', 'created')
+                })}
+              >
                 <Text className="block text-2xl font-bold text-primary">{userStats.createdCount}</Text>
                 <Text className="block text-sm text-muted-foreground">我创建的</Text>
+                <Text className="block text-xs text-blue-400 mt-1">查看详情 ›</Text>
               </View>
-              <View className="flex flex-col items-center">
+              {/* 我负责的 */}
+              <View
+                className="flex flex-col items-center"
+                onClick={() => Taro.switchTab({ url: '/pages/index/index' }).then(() => {
+                  Taro.setStorageSync('pendingFilter', 'assigned')
+                })}
+              >
                 <Text className="block text-2xl font-bold text-primary">{userStats.assignedCount}</Text>
                 <Text className="block text-sm text-muted-foreground">我负责的</Text>
+                <Text className="block text-xs text-blue-400 mt-1">查看详情 ›</Text>
               </View>
-              <View className="flex flex-col items-center">
+              {/* 已完成 */}
+              <View
+                className="flex flex-col items-center"
+                onClick={() => Taro.switchTab({ url: '/pages/index/index' }).then(() => {
+                  Taro.setStorageSync('pendingFilter', 'completed')
+                })}
+              >
                 <Text className="block text-2xl font-bold text-primary">{userStats.completedCount}</Text>
                 <Text className="block text-sm text-muted-foreground">已完成</Text>
+                <Text className="block text-xs text-blue-400 mt-1">查看详情 ›</Text>
               </View>
             </View>
           </CardContent>

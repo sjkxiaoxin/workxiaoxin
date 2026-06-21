@@ -143,7 +143,7 @@ export class TasksService {
   }
 
   // 查询任务列表
-  async listTasks(userId?: string, filter?: 'created' | 'assigned' | 'all', status?: 'todo' | 'in_progress' | 'done') {
+  async listTasks(userId?: string, filter?: 'created' | 'assigned' | 'all' | 'completed', status?: 'todo' | 'in_progress' | 'done') {
     const client = getSupabaseClient();
     
     let query = client
@@ -161,6 +161,9 @@ export class TasksService {
       query = query.eq('creator_id', userId);
     } else if (userId && filter === 'assigned') {
       query = query.eq('assignee_id', userId);
+    } else if (userId && filter === 'completed') {
+      // 已完成 = 我负责的 + 状态为 done
+      query = query.eq('assignee_id', userId).eq('status', 'done');
     }
 
     const { data, error } = await query;
