@@ -122,23 +122,39 @@ export class UsersService {
     const secret = process.env.WECHAT_APP_SECRET
 
     if (!appid || !secret) {
-      throw new Error('WECHAT_APPID 或 WECHAT_APP_SECRET 未配置')
+      throw new Error('服务器未配置微信参数，请联系管理员')
     }
 
     // 调用微信 code2Session 接口
     const url = `https://api.weixin.qq.com/sns/jscode2session?appid=${appid}&secret=${secret}&js_code=${code}&grant_type=authorization_code`
 
-    const res = await fetch(url)
-    const data = await res.json()
+    let data: any
+    try {
+      const res = await fetch(url)
+      data = await res.json()
+    } catch (e) {
+      throw new Error('调用微信接口失败，请检查网络')
+    }
 
     if (data.errcode) {
-      this.logger.error(`微信登录失败: ${data.errcode} ${data.errmsg}`)
-      throw new Error(`微信登录失败: ${data.errmsg}`)
+      this.logger.error(`微信登录失败: errcode=${data.errcode} errmsg=${data.errmsg}`)
+      // 给出更友好的错误提示
+      if (data.errcode === 40029) {
+        throw new Error('登录凭证无效，请重新点击登录')
+      } else if (data.errcode === 45011) {
+        throw new Error('登录太频繁，请稍后再试')
+      } else if (data.errcode === 40163) {
+        throw new Error('登录凭证已使用，请重新点击登录')
+      } else if (data.errcode === -1) {
+        throw new Error('微信服务繁忙，请稍后再试')
+      } else {
+        throw new Error(`微信登录失败(${data.errcode})，请重试`)
+      }
     }
 
     const openid = data.openid
     if (!openid) {
-      throw new Error('未获取到 openid')
+      throw new Error('未获取到 openid，请重试')
     }
 
     // 查找已有用户

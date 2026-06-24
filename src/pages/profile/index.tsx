@@ -103,11 +103,23 @@ const ProfilePage = () => {
 
   // 微信登录
   const handleLogin = async () => {
-    Taro.showLoading({ title: '登录中...' })
-
     try {
-      // 调用微信登录获取 code
-      const { code } = await Taro.login()
+      // 第一步：先唤醒后端（Render 免费版有冷启动，需要等待）
+      Taro.showLoading({ title: '连接服务器...' })
+      try {
+        await Network.request({
+          url: '/api/health',
+          method: 'GET',
+          timeout: 30000
+        })
+      } catch {
+        // 忽略预热失败，继续尝试登录
+      }
+
+      // 第二步：获取微信 code（code 需要在后端唤醒后再获取，避免超时后 code 已作废）
+      Taro.showLoading({ title: '登录中...' })
+      const loginResult = await Taro.login()
+      const { code } = loginResult
 
       if (!code) {
         Taro.hideLoading()
@@ -115,12 +127,12 @@ const ProfilePage = () => {
         return
       }
 
-      // 发送 code 到后端换取 openid 和用户信息
+      // 第三步：发送 code 到后端换取 openid 和用户信息
       const res = await Network.request({
         url: '/api/users/wx-login',
         method: 'POST',
         data: { code },
-        timeout: 15000
+        timeout: 30000
       })
 
       Taro.hideLoading()
@@ -141,12 +153,13 @@ const ProfilePage = () => {
         Taro.showToast({ title: '登录成功', icon: 'success' })
         fetchUserInfo()
       } else {
-        Taro.showToast({ title: res?.data?.msg || '登录失败', icon: 'none' })
+        const errMsg = res?.data?.msg || '登录失败，请重试'
+        Taro.showToast({ title: errMsg, icon: 'none', duration: 3000 })
       }
     } catch (error) {
       Taro.hideLoading()
       console.error('登录失败:', error)
-      Taro.showToast({ title: '登录失败', icon: 'none' })
+      Taro.showToast({ title: '网络超时，请稍后重试', icon: 'none', duration: 3000 })
     }
   }
 
