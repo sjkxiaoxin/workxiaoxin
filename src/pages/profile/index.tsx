@@ -17,12 +17,23 @@ interface UserStats {
   completedCount: number
 }
 
+// 从 Storage 恢复登录状态（避免重渲染丢状态）
+const getStoredLoginState = () => {
+  const loggedIn = Taro.getStorageSync('isLoggedIn')
+  const userId = Taro.getStorageSync('userId')
+  const openid = Taro.getStorageSync('openid')
+  const name = Taro.getStorageSync('userName')
+  const avatar = Taro.getStorageSync('userAvatar')
+  return { loggedIn: !!loggedIn, userId: userId || '', openid: openid || '', name: name || '', avatar: avatar || '' }
+}
+
 const ProfilePage = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const stored = getStoredLoginState()
+  const [isLoggedIn, setIsLoggedIn] = useState(stored.loggedIn)
   const [userInfo, setUserInfo] = useState({
-    id: '',
-    name: '用户',
-    avatar: ''
+    id: stored.userId,
+    name: stored.name || '用户',
+    avatar: stored.avatar || ''
   })
   const [userStats, setUserStats] = useState<UserStats>({
     createdCount: 0,
@@ -33,73 +44,82 @@ const ProfilePage = () => {
   const currentUserId = useCurrentUser()
 
   // 获取用户信息和任务统计
-  const fetchUserInfo = useCallback(async () => {
-    if (!isLoggedIn || !currentUserId) return
+  const fetchUserInfo = useCallback(async (uid?: string) => {
+    const targetId = uid || currentUserId
+    console.log('[fetchUserInfo] targetId=', targetId, 'currentUserId=', currentUserId)
 
     try {
       // 获取用户基本信息
       const userRes = await Network.request({
-        url: `/api/users/${currentUserId}`,
+        url: `/api/users/${targetId}`,
         method: 'GET',
         timeout: 15000
       })
 
-      console.log('获取用户信息响应:', userRes)
+      console.log('[fetchUserInfo] 用户信息响应:', JSON.stringify(userRes?.data))
 
       if (userRes && userRes.data && userRes.data.data) {
+        const fetchedUser = userRes.data.data
         setUserInfo({
-          id: userRes.data.data.id,
-          name: userRes.data.data.name,
-          avatar: userRes.data.data.avatar || ''
+          id: fetchedUser.id,
+          name: fetchedUser.name,
+          avatar: fetchedUser.avatar || ''
         })
+        // 同步到 Storage
+        Taro.setStorageSync('userName', fetchedUser.name)
+        Taro.setStorageSync('userAvatar', fetchedUser.avatar || '')
       }
 
-      // 获取任务列表（传入 userId，后端返回该用户相关的所有任务）
+      // 获取任务统计
       const statsRes = await Network.request({
         url: '/api/tasks',
         method: 'GET',
-        data: { userId: currentUserId, filter: 'all' },
+        data: { userId: targetId, filter: 'all' },
         timeout: 15000
       })
 
-      console.log('获取任务列表响应:', statsRes)
+      console.log('[fetchUserInfo] 任务统计响应:', JSON.stringify(statsRes?.data))
 
       if (statsRes && statsRes.data && statsRes.data.data) {
         const tasks = statsRes.data.data
-
-        // 计算统计数据
-        const createdCount = tasks.filter(t => t.creator_id === currentUserId).length
-        const assignedCount = tasks.filter(t => t.assignee_id === currentUserId).length
-        const completedCount = tasks.filter(t => t.assignee_id === currentUserId && t.status === 'done').length
+        const createdCount = tasks.filter((t: any) => t.creator_id === targetId).length
+        const assignedCount = tasks.filter((t: any) => t.assignee_id === targetId).length
+        const completedCount = tasks.filter((t: any) => t.assignee_id === targetId && t.status === 'done').length
 
         setUserStats({ createdCount, assignedCount, completedCount })
       }
     } catch (error) {
-      console.error('获取用户信息失败:', error)
+      console.error('[fetchUserInfo] 失败:', error)
     }
-  }, [isLoggedIn, currentUserId])
+  }, [currentUserId])
 
-  // 首次加载检查登录状态
+  // 登录状态变化时自动拉取数据
   useEffect(() => {
-    const loggedIn = Taro.getStorageSync('isLoggedIn')
-    if (loggedIn) {
-      setIsLoggedIn(true)
-    }
-  }, [])
-
-  // CRITICAL: 页面每次显示时刷新数据（tab 切换回来时自动更新统计）
-  useDidShow(() => {
+    console.log('[ProfilePage] isLoggedIn changed to:', isLoggedIn)
     if (isLoggedIn) {
       fetchUserInfo()
+    }
+  }, [isLoggedIn])
+
+  // CRITICAL: 页面每次显示时检查登录状态并刷新数据
+  useDidShow(() => {
+    const stored = getStoredLoginState()
+    console.log('[useDidShow] stored=', JSON.stringify(stored))
+    if (stored.loggedIn) {
+      // 确保组件状态与 Storage 同步
+      if (!isLoggedIn) {
+        console.log('[useDidShow] 从 Storage 恢复登录状态')
+        setIsLoggedIn(true)
+      }
+      setUserInfo(prev => {
+        if (prev.id !== stored.userId) {
+          return { id: stored.userId, name: stored.name || prev.name, avatar: stored.avatar || '' }
+        }
+        return prev
+      })
+      fetchUserInfo(stored.userId)
     }
   })
-
-  // 登录状态或用户ID变化时触发获取
-  useEffect(() => {
-    if (isLoggedIn) {
-      fetchUserInfo()
-    }
-  }, [isLoggedIn, fetchUserInfo])
 
   // 微信登录
   const handleLogin = async () => {
@@ -139,11 +159,17 @@ const ProfilePage = () => {
 
       if (res?.data?.code === 200 && res.data.data) {
         const user = res.data.data
-        setIsLoggedIn(true)
+        console.log('[handleLogin] 登录成功, user=', JSON.stringify(user))
+
+        // 先写 Storage（持久化，组件重载也能恢复）
         Taro.setStorageSync('isLoggedIn', true)
         Taro.setStorageSync('userId', user.id)
         Taro.setStorageSync('openid', user.openid || '')
+        Taro.setStorageSync('userName', user.name || '')
+        Taro.setStorageSync('userAvatar', user.avatar || '')
 
+        // 再更新组件状态
+        setIsLoggedIn(true)
         setUserInfo({
           id: user.id,
           name: user.name || '微信用户',
@@ -151,7 +177,7 @@ const ProfilePage = () => {
         })
 
         Taro.showToast({ title: '登录成功', icon: 'success' })
-        fetchUserInfo()
+        // fetchUserInfo 由 useEffect([isLoggedIn]) 自动触发，不用手动调
       } else {
         const errMsg = res?.data?.msg || '登录失败，请重试'
         Taro.showToast({ title: errMsg, icon: 'none', duration: 3000 })
@@ -178,11 +204,17 @@ const ProfilePage = () => {
 
       if (res?.data?.code === 200 && res.data.data) {
         const user = res.data.data
-        setIsLoggedIn(true)
+        console.log('[handleTestLogin] 测试登录成功, user=', JSON.stringify(user))
+
+        // 先写 Storage
         Taro.setStorageSync('isLoggedIn', true)
         Taro.setStorageSync('userId', user.id)
         Taro.setStorageSync('openid', user.openid || '')
+        Taro.setStorageSync('userName', user.name || '')
+        Taro.setStorageSync('userAvatar', user.avatar || '')
 
+        // 再更新组件状态
+        setIsLoggedIn(true)
         setUserInfo({
           id: user.id,
           name: user.name || '测试用户',
@@ -190,7 +222,7 @@ const ProfilePage = () => {
         })
 
         Taro.showToast({ title: '测试登录成功', icon: 'success' })
-        fetchUserInfo()
+        // fetchUserInfo 由 useEffect([isLoggedIn]) 自动触发
       } else {
         Taro.showToast({ title: res?.data?.msg || '测试登录失败', icon: 'none' })
       }
@@ -211,6 +243,8 @@ const ProfilePage = () => {
           setIsLoggedIn(false)
           Taro.removeStorageSync('isLoggedIn')
           Taro.removeStorageSync('userId')
+          Taro.removeStorageSync('userName')
+          Taro.removeStorageSync('userAvatar')
           setUserInfo({ id: '', name: '用户', avatar: '' })
           setUserStats({ createdCount: 0, assignedCount: 0, completedCount: 0 })
           Taro.showToast({ title: '已退出登录', icon: 'none' })
